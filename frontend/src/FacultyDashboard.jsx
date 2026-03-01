@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Award, LogOut, Activity, RefreshCw, Database, ShieldAlert } from 'lucide-react';
+import { Users, Award, LogOut, Activity, RefreshCw, Database, ShieldAlert, BarChart3, TrendingUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import API_BASE from './api';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend, AreaChart, Area, CartesianGrid } from 'recharts';
 
 const FacultyDashboard = () => {
     const navigate = useNavigate();
@@ -12,9 +13,11 @@ const FacultyDashboard = () => {
     const [vulns, setVulns] = useState([]);
     const [loading, setLoading] = useState(true);
     const [seedMsg, setSeedMsg] = useState('');
+    const [analytics, setAnalytics] = useState(null);
 
     useEffect(() => {
         fetchData();
+        fetchAnalytics();
     }, []);
 
     const fetchData = async () => {
@@ -36,6 +39,16 @@ const FacultyDashboard = () => {
         finally { setLoading(false); }
     };
 
+    const fetchAnalytics = async () => {
+        try {
+            const res = await fetch(`${API_BASE}/api/analytics`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await res.json();
+            if (data.success) setAnalytics(data.analytics);
+        } catch (err) { /* silent */ }
+    };
+
     const seedGroups = async () => {
         setSeedMsg('');
         try {
@@ -52,6 +65,11 @@ const FacultyDashboard = () => {
     const totalGroups = groups.length;
     const gradedGroups = groups.filter(g => g.score !== null && g.score !== undefined).length;
     const activeGroups = groups.filter(g => g.status === 'Active').length;
+
+    // Chart colors
+    const SEVERITY_COLORS = { Critical: '#ef4444', High: '#f97316', Medium: '#eab308', Low: '#64748b' };
+    const STATUS_COLORS = { Pending: '#64748b', Accepted: '#10b981', Rejected: '#ef4444' };
+    const SCAN_TYPE_COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444'];
 
     return (
         <div className="min-h-screen bg-[#020617] text-slate-200 flex font-sans">
@@ -70,6 +88,10 @@ const FacultyDashboard = () => {
                         <div className="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white hover:bg-slate-800/50 rounded-xl transition-all cursor-pointer">
                             <ShieldAlert size={20} />
                             <span className="font-medium text-sm">Vulnerabilities</span>
+                        </div>
+                        <div className="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white hover:bg-slate-800/50 rounded-xl transition-all cursor-pointer">
+                            <BarChart3 size={20} />
+                            <span className="font-medium text-sm">Analytics</span>
                         </div>
                     </nav>
                 </div>
@@ -90,7 +112,7 @@ const FacultyDashboard = () => {
                         <p className="text-slate-500 mt-1 font-medium">Welcome, {user?.name || 'Faculty'} — Monitoring Lab Assessments</p>
                     </div>
                     <div className="flex gap-3">
-                        <button onClick={fetchData} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-xl text-sm font-bold transition-all border border-slate-700">
+                        <button onClick={() => { fetchData(); fetchAnalytics(); }} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-xl text-sm font-bold transition-all border border-slate-700">
                             <RefreshCw size={14} /> Refresh
                         </button>
                         <button onClick={seedGroups} className="flex items-center gap-2 bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white px-4 py-2 rounded-xl text-sm font-bold transition-all border border-blue-500/30">
@@ -112,6 +134,111 @@ const FacultyDashboard = () => {
                     <StatCard label="Graded" value={gradedGroups} color="purple" />
                     <StatCard label="Vuln Reports" value={vulns.length} color="yellow" />
                 </div>
+
+                {/* ========== ANALYTICS CHARTS ========== */}
+                {analytics && (
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                        {/* Scans Over Time */}
+                        {analytics.scansPerDay.length > 0 && (
+                            <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-6 backdrop-blur-md">
+                                <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
+                                    <TrendingUp size={16} className="text-blue-400" /> Scans (Last 7 Days)
+                                </h3>
+                                <ResponsiveContainer width="100%" height={180}>
+                                    <AreaChart data={analytics.scansPerDay}>
+                                        <defs>
+                                            <linearGradient id="scanGradient" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                                                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                                        <XAxis dataKey="date" tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => v.slice(5)} />
+                                        <YAxis tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                                        <Tooltip contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '12px', color: '#fff', fontSize: 12 }} />
+                                        <Area type="monotone" dataKey="count" stroke="#3b82f6" strokeWidth={2} fill="url(#scanGradient)" />
+                                    </AreaChart>
+                                </ResponsiveContainer>
+                            </div>
+                        )}
+
+                        {/* Vulnerability Severity Pie */}
+                        {analytics.vulnSeverity.length > 0 && (
+                            <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-6 backdrop-blur-md">
+                                <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
+                                    <ShieldAlert size={16} className="text-red-400" /> Vuln Severity
+                                </h3>
+                                <ResponsiveContainer width="100%" height={180}>
+                                    <PieChart>
+                                        <Pie
+                                            data={analytics.vulnSeverity}
+                                            dataKey="count"
+                                            nameKey="severity"
+                                            cx="50%"
+                                            cy="50%"
+                                            outerRadius={65}
+                                            innerRadius={35}
+                                            paddingAngle={3}
+                                            strokeWidth={0}
+                                        >
+                                            {analytics.vulnSeverity.map((entry, idx) => (
+                                                <Cell key={idx} fill={SEVERITY_COLORS[entry.severity] || '#64748b'} />
+                                            ))}
+                                        </Pie>
+                                        <Tooltip contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '12px', color: '#fff', fontSize: 12 }} />
+                                        <Legend wrapperStyle={{ fontSize: 11, color: '#94a3b8' }} />
+                                    </PieChart>
+                                </ResponsiveContainer>
+                            </div>
+                        )}
+
+                        {/* Scan Types Bar */}
+                        {analytics.scanTypes.length > 0 && (
+                            <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-6 backdrop-blur-md">
+                                <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
+                                    <BarChart3 size={16} className="text-purple-400" /> Scan Types
+                                </h3>
+                                <ResponsiveContainer width="100%" height={180}>
+                                    <BarChart data={analytics.scanTypes}>
+                                        <XAxis dataKey="type" tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} />
+                                        <YAxis tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                                        <Tooltip contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '12px', color: '#fff', fontSize: 12 }} />
+                                        <Bar dataKey="count" radius={[6, 6, 0, 0]}>
+                                            {analytics.scanTypes.map((_, idx) => (
+                                                <Cell key={idx} fill={SCAN_TYPE_COLORS[idx % SCAN_TYPE_COLORS.length]} />
+                                            ))}
+                                        </Bar>
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Platform Totals (from analytics) */}
+                {analytics?.totals && (
+                    <div className="grid grid-cols-4 gap-4 mb-8">
+                        <MiniStat label="Total Scans" value={analytics.totals.scans} icon="📡" />
+                        <MiniStat label="Total Users" value={analytics.totals.users} icon="👤" />
+                        <MiniStat label="Vulnerabilities" value={analytics.totals.vulnerabilities} icon="🛡️" />
+                        <MiniStat label="Groups" value={analytics.totals.groups} icon="👥" />
+                    </div>
+                )}
+
+                {/* Top Scanned Targets */}
+                {analytics?.topTargets?.length > 0 && (
+                    <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-6 backdrop-blur-md mb-8">
+                        <h3 className="text-sm font-bold text-white mb-4">🎯 Top Scanned Targets</h3>
+                        <div className="flex flex-wrap gap-3">
+                            {analytics.topTargets.map((t, i) => (
+                                <div key={i} className="bg-slate-800/60 border border-slate-700/50 px-4 py-2 rounded-xl text-sm flex items-center gap-3">
+                                    <span className="font-mono text-blue-400">{t.target}</span>
+                                    <span className="text-[10px] bg-blue-600/20 text-blue-300 px-2 py-0.5 rounded-full font-bold">{t.count} scans</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 {loading ? (
                     <div className="text-center py-20 text-slate-500">Loading data...</div>
@@ -224,5 +351,16 @@ const StatCard = ({ label, value, color }) => {
         </div>
     );
 };
+
+// Mini analytics stat
+const MiniStat = ({ label, value, icon }) => (
+    <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-4 flex items-center gap-3">
+        <span className="text-2xl">{icon}</span>
+        <div>
+            <div className="text-xl font-black text-white">{value}</div>
+            <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500">{label}</div>
+        </div>
+    </div>
+);
 
 export default FacultyDashboard;

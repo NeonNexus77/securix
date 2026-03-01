@@ -1,8 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Shield, Activity, Search, AlertTriangle, Award, CheckCircle, PlayCircle, Terminal, Wifi, Server, LogOut } from 'lucide-react';
+import { Shield, Activity, Search, AlertTriangle, Award, CheckCircle, PlayCircle, Terminal, Wifi, Server, LogOut, BarChart3 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import API_BASE from './api';
+import { io } from 'socket.io-client';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 const StudentDashboard = () => {
   const { user, token, logout } = useAuth();
@@ -17,6 +19,7 @@ const StudentDashboard = () => {
   ]);
 
   const terminalRef = useRef(null);
+  const socketRef = useRef(null);
 
   // Scan history
   const [scanHistory, setScanHistory] = useState([]);
@@ -30,6 +33,51 @@ const StudentDashboard = () => {
       terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
     }
   }, [terminalLines]);
+
+  // Connect socket on mount
+  useEffect(() => {
+    const socket = io(API_BASE, {
+      auth: { token },
+      transports: ['websocket', 'polling']
+    });
+
+    socket.on('connect', () => {
+      console.log('[Socket] Connected');
+    });
+
+    socket.on('scan-line', ({ line, color }) => {
+      setTerminalLines(prev => [...prev, { text: line, color: color || 'text-slate-400' }]);
+    });
+
+    socket.on('scan-complete', (data) => {
+      setScanResults(data);
+      setScanning(false);
+      setTerminalLines(prev => [
+        ...prev,
+        { text: '> ─────────────────────────────────────────', color: 'text-slate-700' },
+        { text: `> ✅ Scan Complete! ${data.parsed.openPorts} open ports found.`, color: 'text-emerald-400 font-bold' }
+      ]);
+      fetchScanHistory();
+    });
+
+    socket.on('scan-error', ({ error }) => {
+      setScanning(false);
+      setTerminalLines(prev => [
+        ...prev,
+        { text: `> [ERROR] ${error}`, color: 'text-red-500 font-bold' }
+      ]);
+    });
+
+    socket.on('connect_error', (err) => {
+      console.log('[Socket] Connection error, falling back to REST:', err.message);
+    });
+
+    socketRef.current = socket;
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [token]);
 
   // Fetch scan history on mount
   useEffect(() => {
@@ -53,7 +101,7 @@ const StudentDashboard = () => {
     status: "Graded"
   };
 
-  // ========== REAL NMAP SCAN ==========
+  // ========== REAL NMAP SCAN (WebSocket) ==========
   const runScan = async () => {
     if (!targetIp) return alert("Please enter a Target IP!");
 
@@ -61,6 +109,17 @@ const StudentDashboard = () => {
     setScanResults(null);
     setTerminalLines([
       { text: 'SECURE-LAB OS v4.2.0-STABLE', color: 'text-slate-500' },
+    ]);
+
+    // Try WebSocket first
+    if (socketRef.current && socketRef.current.connected) {
+      socketRef.current.emit('start-scan', { targetIp, scanType });
+      return;
+    }
+
+    // Fallback to REST API
+    setTerminalLines(prev => [
+      ...prev,
       { text: `> Initializing ${scanType.toUpperCase()} scan on ${targetIp}...`, color: 'text-slate-300' },
       { text: '> [SCANNING] Running Nmap... Please wait.', color: 'text-blue-400 animate-pulse' }
     ]);
@@ -88,29 +147,22 @@ const StudentDashboard = () => {
           { text: `> ─────────────────────────────────────────`, color: 'text-slate-700' },
         ];
 
-        // Add each port
         if (data.parsed.ports.length > 0) {
           lines.push({ text: `>   PORT       STATE      SERVICE`, color: 'text-slate-500 font-bold' });
           data.parsed.ports.forEach(port => {
             const stateColor = port.state === 'open' ? 'text-red-400' : port.state === 'filtered' ? 'text-yellow-500' : 'text-slate-600';
             const portStr = `${port.port}/${port.protocol}`.padEnd(10);
             const stateStr = port.state.padEnd(10);
-            lines.push({
-              text: `>   ${portStr} ${stateStr} ${port.service}`,
-              color: stateColor
-            });
+            lines.push({ text: `>   ${portStr} ${stateStr} ${port.service}`, color: stateColor });
           });
         } else {
           lines.push({ text: `> No open ports found.`, color: 'text-slate-500' });
         }
 
-        // OS detection if available
         if (data.parsed.osGuess) {
           lines.push({ text: `> ─────────────────────────────────────────`, color: 'text-slate-700' });
           lines.push({ text: `> ${data.parsed.osGuess}`, color: 'text-cyan-400' });
         }
-
-        // Scan timing
         if (data.parsed.scanTime) {
           lines.push({ text: `> ─────────────────────────────────────────`, color: 'text-slate-700' });
           lines.push({ text: `> ${data.parsed.scanTime}`, color: 'text-slate-500' });
@@ -118,6 +170,7 @@ const StudentDashboard = () => {
 
         setTerminalLines(lines);
         setScanResults(data);
+        fetchScanHistory();
       } else {
         setTerminalLines([
           { text: 'SECURE-LAB OS v4.2.0-STABLE', color: 'text-slate-500' },
@@ -135,6 +188,16 @@ const StudentDashboard = () => {
       setScanning(false);
     }
   };
+
+  // Scan type chart data
+  const scanTypeData = scanHistory.reduce((acc, scan) => {
+    const type = scan.scanType || 'quick';
+    const existing = acc.find(a => a.type === type);
+    if (existing) existing.count++;
+    else acc.push({ type, count: 1 });
+    return acc;
+  }, []);
+  const chartColors = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6'];
 
   return (
     <div className="min-h-screen bg-[#020617] text-slate-200 flex font-sans">
@@ -226,7 +289,7 @@ const StudentDashboard = () => {
                 </button>
               </div>
 
-              {/* REAL Terminal View */}
+              {/* Live WebSocket Terminal View */}
               <div
                 ref={terminalRef}
                 className="bg-black/80 rounded-2xl p-5 font-mono text-sm h-72 border border-slate-800 shadow-inner overflow-y-auto scroll-smooth"
@@ -238,9 +301,15 @@ const StudentDashboard = () => {
                 ))}
                 {scanning && (
                   <p className="animate-pulse text-blue-400 font-bold mt-2">
-                    {'> [SCANNING] Please wait...'}
+                    {'> [SCANNING] Live output streaming...'}
                   </p>
                 )}
+              </div>
+
+              {/* WebSocket Status */}
+              <div className="mt-3 flex items-center gap-2 text-xs text-slate-500">
+                <div className={`w-2 h-2 rounded-full ${socketRef.current?.connected ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
+                {socketRef.current?.connected ? 'Live Mode (WebSocket)' : 'Standard Mode (REST)'}
               </div>
             </div>
 
@@ -277,7 +346,7 @@ const StudentDashboard = () => {
             </div>
           </div>
 
-          {/* Right Column: Logging Form + Scan History */}
+          {/* Right Column: Logging Form + Scan History + Analytics */}
           <div className="space-y-8">
             <div className="bg-slate-900/40 border border-slate-800 p-8 rounded-[2.5rem] backdrop-blur-md h-fit">
               <h2 className="text-xl font-bold mb-6 flex items-center gap-2 text-white italic tracking-tight">
@@ -340,6 +409,29 @@ const StudentDashboard = () => {
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* Mini Scan Type Chart */}
+            {scanTypeData.length > 0 && (
+              <div className="bg-slate-900/40 border border-slate-800 p-6 rounded-[2.5rem] backdrop-blur-md">
+                <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                  <BarChart3 size={18} className="text-purple-400" /> My Scans by Type
+                </h3>
+                <ResponsiveContainer width="100%" height={160}>
+                  <BarChart data={scanTypeData}>
+                    <XAxis dataKey="type" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                    <Tooltip
+                      contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '12px', color: '#fff' }}
+                    />
+                    <Bar dataKey="count" radius={[6, 6, 0, 0]}>
+                      {scanTypeData.map((_, idx) => (
+                        <Cell key={idx} fill={chartColors[idx % chartColors.length]} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
             )}
           </div>
