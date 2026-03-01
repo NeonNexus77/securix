@@ -4,7 +4,9 @@ const AuthContext = createContext(null);
 
 export const useAuth = () => useContext(AuthContext);
 
-const API_URL = 'http://localhost:5000/api/auth';
+import API_BASE from './api';
+
+const API_URL = `${API_BASE}/api/auth`;
 
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);

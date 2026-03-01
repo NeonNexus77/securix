@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Users, ShieldAlert, Clock, Search, LayoutDashboard, Database, LogOut, Award, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
+import API_BASE from './api';
 
 const TADashboard = () => {
   const navigate = useNavigate();
@@ -19,7 +20,7 @@ const TADashboard = () => {
 
   const fetchGroups = async () => {
     try {
-      const res = await fetch('http://localhost:5000/api/groups', {
+      const res = await fetch(`${API_BASE}/api/groups`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();
@@ -34,7 +35,7 @@ const TADashboard = () => {
     const feedback = e.target.feedback?.value || '';
 
     try {
-      const res = await fetch(`http://localhost:5000/api/groups/${selectedGroup._id}/grade`, {
+      const res = await fetch(`${API_BASE}/api/groups/${selectedGroup._id}/grade`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ score: parseInt(marks), feedback })

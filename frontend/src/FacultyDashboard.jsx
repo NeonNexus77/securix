@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Users, Award, LogOut, Activity, RefreshCw, Database, ShieldAlert } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
+import API_BASE from './api';
 
 const FacultyDashboard = () => {
     const navigate = useNavigate();
@@ -20,10 +21,10 @@ const FacultyDashboard = () => {
         setLoading(true);
         try {
             const [groupRes, vulnRes] = await Promise.all([
-                fetch('http://localhost:5000/api/groups', {
+                fetch(`${API_BASE}/api/groups`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 }),
-                fetch('http://localhost:5000/api/vulnerabilities', {
+                fetch(`${API_BASE}/api/vulnerabilities`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 })
             ]);
@@ -38,7 +39,7 @@ const FacultyDashboard = () => {
     const seedGroups = async () => {
         setSeedMsg('');
         try {
-            const res = await fetch('http://localhost:5000/api/groups/seed', {
+            const res = await fetch(`${API_BASE}/api/groups/seed`, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -187,13 +188,13 @@ const FacultyDashboard = () => {
                                             </div>
                                             <div className="flex items-center gap-3">
                                                 <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase border ${v.severity === 'Critical' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
-                                                        v.severity === 'High' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
-                                                            v.severity === 'Medium' ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' :
-                                                                'bg-slate-500/10 text-slate-400 border-slate-500/20'
+                                                    v.severity === 'High' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
+                                                        v.severity === 'Medium' ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' :
+                                                            'bg-slate-500/10 text-slate-400 border-slate-500/20'
                                                     }`}>{v.severity}</span>
                                                 <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase border ${v.status === 'Accepted' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                                                        v.status === 'Rejected' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
-                                                            'bg-slate-500/10 text-slate-400 border-slate-500/20'
+                                                    v.status === 'Rejected' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
+                                                        'bg-slate-500/10 text-slate-400 border-slate-500/20'
                                                     }`}>{v.status}</span>
                                             </div>
                                         </div>

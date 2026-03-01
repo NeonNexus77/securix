@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Shield, Activity, Search, AlertTriangle, Award, CheckCircle, PlayCircle, Terminal, Wifi, Server, LogOut } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
+import API_BASE from './api';
 
 const StudentDashboard = () => {
   const { user, token, logout } = useAuth();
@@ -37,7 +38,7 @@ const StudentDashboard = () => {
 
   const fetchScanHistory = async () => {
     try {
-      const res = await fetch('http://localhost:5000/api/scans', {
+      const res = await fetch(`${API_BASE}/api/scans`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();
@@ -65,7 +66,7 @@ const StudentDashboard = () => {
     ]);
 
     try {
-      const response = await fetch('http://localhost:5000/api/scan', {
+      const response = await fetch(`${API_BASE}/api/scan`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -291,7 +292,7 @@ const StudentDashboard = () => {
                 e.preventDefault();
                 setVulnMsg('');
                 try {
-                  const res = await fetch('http://localhost:5000/api/vulnerabilities', {
+                  const res = await fetch(`${API_BASE}/api/vulnerabilities`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                     body: JSON.stringify(vulnForm)
