@@ -1,3 +1,4 @@
-// Uses VITE_API_URL env variable in production, falls back to localhost for dev
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+// In dev mode, Vite proxy handles /api requests (see vite.config.js)
+// In production, set VITE_API_URL to the backend URL
+const API_BASE = import.meta.env.VITE_API_URL || '';
 export default API_BASE;
