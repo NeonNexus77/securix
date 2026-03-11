@@ -10,7 +10,11 @@ import FacultyDashboard from './FacultyDashboard';
 
 // Protected Route — redirects to /login if not logged in
 const ProtectedRoute = ({ children, allowedRoles }) => {
-  const { user, token } = useAuth();
+  const { user, token, loading } = useAuth();
+
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center bg-[#0a0f1c] text-[#00ffcc]">Loading...</div>;
+  }
 
   if (!token || !user) {
     return <Navigate to="/login" replace />;
