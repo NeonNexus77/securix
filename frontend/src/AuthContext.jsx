@@ -9,20 +9,16 @@ import API_BASE from './api';
 const API_URL = `${API_BASE}/api/auth`;
 
 export const AuthProvider = ({ children }) => {
-    const [user, setUser] = useState(null);
-    const [token, setToken] = useState(localStorage.getItem('token'));
-    const [loading, setLoading] = useState(true);
-
-    // this allows the app to persist login state across refreshes
-    useEffect(() => {
-        const savedToken = localStorage.getItem('token');
-        const savedUser = localStorage.getItem('user');
-        if (savedToken && savedUser) {
-            setToken(savedToken);
-            setUser(JSON.parse(savedUser));
+    const [user, setUser] = useState(() => {
+        try {
+            const savedUser = localStorage.getItem('user');
+            return savedUser ? JSON.parse(savedUser) : null;
+        } catch {
+            return null;
         }
-        setLoading(false);
-    }, []);
+    });
+    const [token, setToken] = useState(() => localStorage.getItem('token'));
+    const [loading, setLoading] = useState(false);
 
     // signup 
     const signup = async (name, email, password, role) => {
